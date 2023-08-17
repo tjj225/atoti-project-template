@@ -51,6 +51,20 @@ A few examples:
   poetry run app format
   ```
 
+- Docker build imgage:
+
+  ```bash
+  docker build -t getting-started .  --progress=plain
+
+  ```
+
+- Docker run:
+
+  ```bash
+  docker run -dp  9090:80 getting-started
+
+  ```
+
 ## Variants
 
 This repository has the following long-lived branches showcasing different aspects:

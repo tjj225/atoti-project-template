@@ -37,9 +37,12 @@ class Config(BaseSettings):
 
     requests_timeout: timedelta = timedelta(seconds=30)
 
+    _ROOT_DIRECTORY = Path(__file__).parent.parent
+    _TESTS_DATA_PATH = _ROOT_DIRECTORY / "tests/data"
+
     reverse_geocoding_path: Union[HttpUrl, FilePath] = TypeAdapter(
-        HttpUrl
-    ).validate_python("https://api-adresse.data.gouv.fr/reverse/csv/")
+        FilePath
+    ).validate_python(_TESTS_DATA_PATH / "station_location.csv")
 
     user_content_storage: Annotated[
         Optional[Union[PostgresDsn, Path]],
@@ -51,10 +54,8 @@ class Config(BaseSettings):
     ] = Path("content")
 
     velib_data_base_path: Union[HttpUrl, DirectoryPath] = TypeAdapter(
-        HttpUrl
-    ).validate_python(
-        "https://velib-metropole-opendata.smoove.pro/opendata/Velib_Metropole"
-    )
+        DirectoryPath
+    ).validate_python(_TESTS_DATA_PATH)
 
     @field_validator("user_content_storage")
     @classmethod
