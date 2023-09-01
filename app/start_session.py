@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import asdict
 from pathlib import Path
 
 import atoti as tt
@@ -34,4 +35,19 @@ def start_session(*, config: Config) -> tt.Session:
     create_and_join_tables(session)
     create_cubes(session)
     load_tables(session, config=config)
+    expose_endpoint(session, config=config)
     return session
+
+
+def expose_endpoint(session: tt.Session, /, *, config: Config) -> None:
+    @session.endpoint("roll", method="GET")
+    def roll_dice(request, user, session):
+        msg = "Roll a dice"
+        print(msg)
+        print(msg)
+        print(msg)
+        return msg
+
+    @session.endpoint("whoami", method="GET")
+    def whoami(request, user, session):
+        return asdict(user)

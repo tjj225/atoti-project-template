@@ -71,3 +71,7 @@ This repository has the following long-lived branches showcasing different aspec
 
 - [`deploy-to-aws`](https://github.com/atoti/project-template/tree/deploy-to-aws) for deploying on AWS ECS.
 - [`deploy-to-heroku`](https://github.com/atoti/project-template/tree/deploy-to-heroku) for a one-click deploy to Heroku.
+
+Example of custom endpoint
+http://localhost:9090/atoti/pyapi/whoami
+http://localhost:9090/atoti/pyapi/roll
