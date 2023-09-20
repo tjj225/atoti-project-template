@@ -26,6 +26,7 @@ def create_session(*, config: Config) -> tt.Session:
         logging=loggingConfig,
         port=config.port,
         user_content_storage=user_content_storage,
+        java_options=config.java_options,
     )
 
 

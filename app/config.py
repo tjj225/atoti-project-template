@@ -37,6 +37,11 @@ class Config(BaseSettings):
 
     requests_timeout: timedelta = timedelta(seconds=30)
 
+    java_options: Optional[Sequence[str]] = [
+        "-Xms10g",
+        "-Xmx10g",
+        "-Dmanagement.endpoint.shutdown.enabled=true",
+    ]
     log_file: str = "./server_template.log"
 
     _ROOT_DIRECTORY = Path(__file__).parent.parent
