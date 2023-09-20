@@ -37,6 +37,8 @@ class Config(BaseSettings):
 
     requests_timeout: timedelta = timedelta(seconds=30)
 
+    log_file: str = "./server_template.log"
+
     _ROOT_DIRECTORY = Path(__file__).parent.parent
     _TESTS_DATA_PATH = _ROOT_DIRECTORY / "tests/data"
 

@@ -21,9 +21,9 @@ def create_session(*, config: Config) -> tt.Session:
             if isinstance(config.user_content_storage, Path)
             else tt.UserContentStorageConfig(url=str(config.user_content_storage))
         )
-
+    loggingConfig = tt.LoggingConfig(destination=config.log_file)
     return tt.Session(
-        logging=tt.LoggingConfig(destination=sys.stdout),
+        logging=loggingConfig,
         port=config.port,
         user_content_storage=user_content_storage,
     )
