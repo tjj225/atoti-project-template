@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import Annotated, Optional, Union
@@ -31,6 +32,7 @@ class Config(BaseSettings):
     model_config = SettingsConfigDict(frozen=True)
 
     data_refresh_period: Optional[timedelta] = timedelta(minutes=1)
+    password_refresh_period: Optional[timedelta] = timedelta(seconds=10)
 
     # The $PORT environment variable is used by most PaaS to indicate the port the app server should bind to.
     port: int = 9090

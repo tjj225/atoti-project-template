@@ -6,7 +6,7 @@ import atoti as tt
 
 from .config import Config
 from .load_tables import load_tables
-from .start_session import start_session
+from .start_session import set_password, start_session
 from .util import run_periodically
 
 
@@ -25,6 +25,15 @@ class App:
             else None
         )
 
+        self._stop_rotating_pass = (
+            run_periodically(
+                lambda: set_password(self.session, config=config),
+                period=config.password_refresh_period,
+            )
+            if config.password_refresh_period
+            else None
+        )
+
     @property
     def session(self) -> tt.Session:
         return self._session
@@ -32,6 +41,8 @@ class App:
     def close(self) -> None:
         if self._stop_refreshing_data:
             self._stop_refreshing_data()
+        if self._stop_rotating_pass:
+            self._stop_rotating_pass()
         self.session.close()
 
     def __enter__(self) -> App:
