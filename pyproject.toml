@@ -5,7 +5,7 @@ description = ""
 authors = []
 
 [tool.poetry.dependencies]
-atoti = { version = "0.9.0a0" }
+atoti = { version = "0.9.0" }
 pandas = "*"
 pydantic = "*"
 pydantic-settings = "*"
