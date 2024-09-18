@@ -66,11 +66,10 @@ def create_station_cube(session: tt.Session, /) -> None:
                 tt.agg.single_value(
                     station_details_table[StationDetailsTableColumn.CAPACITY.value]
                 ),
-                scope=tt.OriginScope(l[StationCubeStationLevel.ID.value]),
+                scope=tt.OriginScope(levels={l[StationCubeStationLevel.ID.value]}),
             ),
         }
     )
-
 
 def create_cubes(session: tt.Session, /) -> None:
     create_station_cube(session)

@@ -21,10 +21,12 @@ def create_session(*, config: Config) -> tt.Session:
             else tt.UserContentStorageConfig(url=str(config.user_content_storage))
         )
 
-    return tt.Session(
-        logging=tt.LoggingConfig(destination=sys.stdout),
-        port=config.port,
-        user_content_storage=user_content_storage,
+    return tt.Session.start(
+        tt.SessionConfig(
+            logging=tt.LoggingConfig(destination=sys.stdout),
+            port=config.port,
+            user_content_storage=user_content_storage,
+        ),
     )
 
 
@@ -33,5 +35,5 @@ def start_session(*, config: Config) -> tt.Session:
     session = create_session(config=config)
     create_and_join_tables(session)
     create_cubes(session)
-    load_tables(session, config=config)
+    #load_tables(session, config=config)
     return session
