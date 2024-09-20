@@ -142,6 +142,20 @@ kafka = ["atoti-server-kafka (==0.9.0)"]
 observability = ["atoti-server-observability (==0.9.0)"]
 
 [[package]]
+name = "atoti-server-observability"
+version = "0.9.0"
+description = "Experimental resources providing observability of Atoti sessions"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "atoti_server_observability-0.9.0-py3-none-any.whl", hash = "sha256:4a5db97f7f86bafb688a4d8388568b14439a9d240216ea46d055674eb0d7e2de"},
+]
+
+[package.dependencies]
+atoti-core = "0.9.0"
+typing-extensions = ">=4.6.1"
+
+[[package]]
 name = "black"
 version = "24.8.0"
 description = "The uncompromising code formatter."
@@ -1248,4 +1262,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10"
-content-hash = "f081679760a9588a9ee22b7e0f6c612875b3df092aa26b3545d0895603a3e4f0"
+content-hash = "908ed380b143d203e31f693605ee282412892679826976b2f5d7fa03c60b31c6"

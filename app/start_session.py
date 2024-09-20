@@ -26,6 +26,18 @@ def create_session(*, config: Config) -> tt.Session:
             logging=tt.LoggingConfig(destination=sys.stdout),
             port=config.port,
             user_content_storage=user_content_storage,
+            java_options=[
+                "-Dspring.profiles.active=application-monitoring",
+                "-Djson.log.dir=/tmp",
+                "-Dotel.java.global-autoconfigure.enabled=true",
+                "-Dotel.logs.exporter=otlp",
+                "-Dotel.metrics.exporter=otlp",
+                "-Dotel.traces.exporter=otlp",
+                "-Dotel.exporter.otlp.endpoint=http://localhost:4317",
+                "-Dotel.traces.sampler=always_on",
+                "-Dotel.metric.export.interval=60000",
+                "-Dotel.resource.attributes=service.name=dev1-basline-atoti,service.version=1.0",
+            ],
         ),
     )
 
@@ -35,5 +47,5 @@ def start_session(*, config: Config) -> tt.Session:
     session = create_session(config=config)
     create_and_join_tables(session)
     create_cubes(session)
-    #load_tables(session, config=config)
+    # load_tables(session, config=config)
     return session
