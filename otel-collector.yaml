@@ -1,0 +1,108 @@
+extensions:
+  health_check:
+  pprof:
+    endpoint: 0.0.0.0:1777
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+  filelog:
+    include: [/data/*.log]
+    operators:
+      - type: regex_parser
+        regex: "(?P<mask_key>jvm)" # "regex pattern does not match", "action": "send"}   on lines which does not have pattern
+        parse_from: body
+      - type: add
+        field: body
+        if: "attributes.mask_key != nil"
+        value: EXPR(replace(body, attributes.mask_key, 'MASKED'))
+      - type: remove
+        if: "attributes.mask_key != nil"
+        field: attributes.mask_key
+      - type: json_parser
+        timestamp:
+          parse_from: attributes.log_timestamp
+          layout_type: epoch
+          layout: s
+
+# processors:
+#   attributes:
+#     actions:
+#       - key: message # works
+#         action: update
+#         value: "MASKED"
+# processors:
+#   attributes:
+#     actions:
+#       - key: message # nope
+#         action: update
+#         value: "$replace_all_patterns(attributes, 'value', 'jvm', 'MASKED')"
+
+# processors:
+#   body:  #NO
+#     actions:
+#       - key: stringValue
+#         action: update
+#         value: "MASKED"
+processors:
+  attributes:
+    include:
+      match_type: regexp
+      log_bodies: ["jvm*"]
+    actions:
+      - key: message
+        action: update
+        value: "MASKED"
+  redaction/update: # "redaction/update" processor, in pipeline "logs": telemetry type is not supported
+    allow_all_keys: true
+    blocked_values:
+      - "/jvm/gmi" ## Visa
+    summary: debug
+
+  # transform:
+  #   log_statements:
+  #     - context: log
+  #       statements:
+  #         - set(body, replace_all(body, "([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\\.[a-zA-Z0-9_-]+)", "${1}@*****"))
+  transform:
+    log_statements:
+      - context: log
+        statements:
+          - replace_pattern(body, "(?i)jvm", "XXXXXXXXXXX")
+
+# processors:
+#   attributes:
+#     actions:
+#       - key: resourceLogs[0].scopeLogs[0].logRecords[0].body.stringValue # Specifically target the stringValue field in logRecords
+#         action: update
+#         value: "MASKED"
+
+exporters:
+  logging:
+    loglevel: debug
+  file/no_rotation:
+    path: /data/metrics.json
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      #processors: [redaction/update]
+      exporters: [logging]
+    metrics:
+      receivers: [otlp]
+      exporters: [logging]
+    logs:
+      receivers: [filelog]
+      #processors: [transform, attributes]
+      processors: [transform]
+      exporters: [logging]
+
+  extensions: [pprof, zpages]
+  telemetry:
+    logs:
+      level: debug
