@@ -4,56 +4,35 @@ This template can be used to start Atoti projects where the goal is to [go into 
 
 On top of the `atoti` package, it comes with:
 
-- Dependency management with [Poetry](https://python-poetry.org)
-- Settings management with [Pydantic](https://docs.pydantic.dev/latest/usage/settings)
+- Dependency management with [uv](https://docs.astral.sh/uv)
+- Config management with [Pydantic](https://docs.pydantic.dev/2.6/concepts/pydantic_settings)
 - Testing with [pytest](https://docs.pytest.org)
 - Type checking with [mypy](http://mypy-lang.org)
-- Formatting with [Black](https://black.readthedocs.io)
-- Linting with [Ruff](https://beta.ruff.rs)
+- Formatting and linting with [Ruff](https://docs.astral.sh/ruff)
 - Continuous testing with [GitHub Actions](https://github.com/features/actions)
 
 ## Usage
 
 ### Installation
 
-- [Install `poetry`](https://python-poetry.org/docs/#installation)
+- [Install `uv`](https://docs.astral.sh/uv/getting-started/installation)
 - Install the dependencies:
 
   ```bash
-  poetry install
+  uv sync
   ```
 
 ### Commands
 
-To get a list of the commands that can be executed to interact with the project, run:
+To start the app:
 
 ```bash
-poetry run app --help
+uv run python -m app
 ```
 
-A few examples:
+Other useful commands can be found in [`test.yml`](.github/workflows/test.yml).
 
-- Start the app:
+## Deployment
 
-  ```bash
-  poetry run app start
-  ```
-
-- Launch the tests:
-
-  ```bash
-  poetry run app test
-  ```
-
-- Reformat the code:
-
-  ```bash
-  poetry run app format
-  ```
-
-## Variants
-
-This repository has the following long-lived branches showcasing different aspects:
-
-- [`deploy-to-aws`](https://github.com/atoti/project-template/tree/deploy-to-aws) for deploying on AWS ECS.
-- [`deploy-to-heroku`](https://github.com/atoti/project-template/tree/deploy-to-heroku) for a one-click deploy to Heroku.
+This repository automatically deploys to [AWS ECS](https://aws.amazon.com/ecs/).
+To deploy somewhere else, delete [`task-definition.json`](task-definition.json) and adapt [`deploy.yml`](.github/workflows/deploy.yml).

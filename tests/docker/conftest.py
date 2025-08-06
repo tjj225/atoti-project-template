@@ -1,47 +1,23 @@
-from __future__ import annotations
-
-import re
 from collections.abc import Generator
 from datetime import timedelta
+from pathlib import Path
 from shutil import which
 from uuid import uuid4
 
 import atoti as tt
 import docker
 import pytest
-from docker.models.containers import Container
 
-from ._docker_container import docker_container as _docker_container
+from ._docker_container import docker_container
 from ._run_command import run_command
 from ._timeout import Timeout
 
 
-@pytest.fixture(name="docker_executable_path", scope="session")
-def docker_executable_path_fixture() -> str:
-    docker_executable_path = which("docker")
-    assert docker_executable_path
-    return docker_executable_path
-
-
-@pytest.fixture(name="poetry_executable_path", scope="session")
-def poetry_executable_path_fixture() -> str:
-    poetry_executable_path = which("poetry")
-    assert poetry_executable_path
-    return poetry_executable_path
-
-
-@pytest.fixture(name="docker_image_name", scope="session")
-def docker_image_name_fixture(
-    docker_executable_path: str, poetry_executable_path: str, project_name: str
-) -> Generator[str, None, None]:
-    tag = f"{project_name}:{uuid4()}"
-    build_image_output = run_command(
-        [poetry_executable_path, "run", "app", "build-docker", tag]
-    )
-    assert f"naming to docker.io/library/{tag}" in build_image_output
-    yield tag
-    remove_image_output = run_command([docker_executable_path, "image", "rm", tag])
-    assert re.match("(Deleted|Untagged)", remove_image_output)
+@pytest.fixture(name="docker_bin", scope="session")
+def docker_bin_fixture() -> Path:
+    docker_bin = which("docker")
+    assert docker_bin
+    return Path(docker_bin)
 
 
 @pytest.fixture(name="docker_client", scope="session")
@@ -49,35 +25,54 @@ def docker_client_fixture() -> docker.DockerClient:
     return docker.from_env()
 
 
-@pytest.fixture(
-    name="docker_container",
-    # Don't use this fixture in tests mutating the container or its underlying app.
-    scope="session",
-)
-def docker_container_fixture(
-    docker_client: docker.DockerClient,
-    docker_image_name: str,
-) -> Generator[Container, None, None]:
+@pytest.fixture(name="docker_image_name", scope="session")
+def docker_image_name_fixture(
+    docker_bin: Path, docker_client: docker.DockerClient, project_name: str
+) -> Generator[str, None, None]:
+    tag = f"{project_name}:{uuid4()}"
+
+    # BuildKit is enabled by default for all users on Docker Desktop.
+    # See https://docs.docker.com/build/buildkit/#getting-started.
+    is_buildkit_already_enabled = (
+        "docker desktop" in run_command([str(docker_bin), "version"]).lower()
+    )
+
+    # BuildKit is not supported by Docker's Python SDK so `docker_client.images.build` cannot be used.
+    # See https://github.com/docker/docker-py/issues/2230.
+    output = run_command(
+        [str(docker_bin), "build", "--tag", tag, "."],
+        env=None if is_buildkit_already_enabled else {"DOCKER_BUILDKIT": "1"},
+    )
+    assert f"naming to docker.io/library/{tag}" in output
+    yield tag
+    docker_client.images.remove(tag)
+
+
+@pytest.fixture(name="session_inside_docker_container", scope="session")
+def session_inside_docker_container_fixture(
+    docker_client: docker.DockerClient, docker_image_name: str
+) -> Generator[tt.Session, None, None]:
     timeout = Timeout(timedelta(minutes=1))
 
-    with _docker_container(docker_image_name, client=docker_client) as container:
+    with docker_container(
+        docker_image_name,
+        client=docker_client,
+        env={
+            # Test external APIs.
+            "DATA_REFRESH_PERIOD": "30"
+        },
+    ) as container:
         logs = container.logs(stream=True)
 
         while "Session listening on port" not in next(logs).decode():
             if timeout.timed_out:
                 raise RuntimeError(f"Session start timed out:\n{container.logs()}")
 
-        yield container
-
-
-@pytest.fixture(name="host_port", scope="session")
-def host_port_fixture(docker_executable_path: str, docker_container: Container) -> int:
-    container_port_output = run_command(
-        [docker_executable_path, "container", "port", docker_container.name]
-    )
-    return int(container_port_output.rsplit(":", maxsplit=1)[-1].strip())
-
-
-@pytest.fixture(name="query_session_inside_docker_container", scope="session")
-def query_session_inside_docker_container_fixture(host_port: int) -> tt.QuerySession:
-    return tt.QuerySession(f"http://localhost:{host_port}")
+        container.reload()  # Refresh `attrs` to get its `HostPort`.
+        host_port = int(
+            next(iter(container.attrs["NetworkSettings"]["Ports"].values()))[0][
+                "HostPort"
+            ]
+        )
+        session = tt.Session.connect(f"http://localhost:{host_port}")
+        yield session

@@ -8,9 +8,16 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup
-      - run: poetry run app format --check
-      - run: poetry run app lint --check
-      - run: poetry run app typecheck
-      - run: poetry run app test
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          # Keep in sync with `Dockerfile`'s `builder`.
+          version: "0.5.6"
+      - run: uv python install 3.10
+      - run: uv sync --locked
+      - run: uv run -m skeleton
+      - run: uv run ruff format --check
+      - run: uv run ruff check
+      - run: uv run mypy
+      - run: uv run pytest

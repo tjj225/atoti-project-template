@@ -1,9 +1,14 @@
-from __future__ import annotations
+import asyncio
+from urllib.parse import urlparse
 
-from . import App, Config
+from . import Config, start_app
 
-config = Config()
 
-with App(config=config) as app:
-    print(f"Session listening on port {app.session.port}")  # noqa: T201
-    app.session.wait()
+async def main() -> None:
+    async with start_app(config=Config()) as session:
+        port = urlparse(session.url).port or 80
+        print(f"Session listening on port {port}")  # noqa: T201
+        await asyncio.to_thread(session.wait)
+
+
+asyncio.run(main())

@@ -1,38 +1,42 @@
-from __future__ import annotations
-
+import asyncio
 from collections.abc import Iterable, Mapping
-from datetime import timedelta
 from pathlib import Path
 from typing import Any, cast
 
 import atoti as tt
+import httpx
 import pandas as pd
-from pydantic import HttpUrl
+from pydantic import DirectoryPath, FilePath, HttpUrl
 
 from .config import Config
-from .constants import StationDetailsTableColumn, StationStatusTableColumn, Table
+from .path import RESOURCES_DIRECTORY
+from .skeleton import Skeleton
 from .util import read_json, reverse_geocode
 
 
-def read_station_details(
+async def read_station_details(
     *,
+    http_client: httpx.AsyncClient,
     reverse_geocoding_path: HttpUrl | Path,
-    timeout: timedelta,
     velib_data_base_path: HttpUrl | Path,
 ) -> pd.DataFrame:
+    skeleton = Skeleton.tables.STATION_DETAILS
+
     stations_data: Any = cast(
         Any,
-        read_json(
-            velib_data_base_path, Path("station_information.json"), timeout=timeout
+        await read_json(
+            velib_data_base_path,
+            Path("station_information.json"),
+            http_client=http_client,
         ),
     )["data"]["stations"]
     station_information_df = pd.DataFrame(stations_data)[
         ["station_id", "name", "capacity", "lat", "lon"]
     ].rename(
         columns={
-            "station_id": StationDetailsTableColumn.ID.value,
-            "name": StationDetailsTableColumn.NAME.value,
-            "capacity": StationDetailsTableColumn.CAPACITY.value,
+            "station_id": skeleton.ID.name,
+            "name": skeleton.NAME.name,
+            "capacity": skeleton.CAPACITY.name,
             "lat": "latitude",
             "lon": "longitude",
         }
@@ -48,14 +52,14 @@ def read_station_details(
     )
 
     reverse_geocoded_df = reverse_geocode(
-        coordinates, reverse_geocoding_path=reverse_geocoding_path, timeout=timeout
+        coordinates, reverse_geocoding_path=reverse_geocoding_path
     ).rename(
         columns={
-            "department": StationDetailsTableColumn.DEPARTMENT.value,
-            "city": StationDetailsTableColumn.CITY.value,
-            "postcode": StationDetailsTableColumn.POSTCODE.value,
-            "street": StationDetailsTableColumn.STREET.value,
-            "house_number": StationDetailsTableColumn.HOUSE_NUMBER.value,
+            "department": skeleton.DEPARTMENT.name,
+            "city": skeleton.CITY.name,
+            "postcode": skeleton.POSTCODE.name,
+            "street": skeleton.STREET.name,
+            "house_number": skeleton.HOUSE_NUMBER.name,
         }
     )
 
@@ -64,15 +68,21 @@ def read_station_details(
     ).drop(columns=coordinates_column_names)
 
 
-def read_station_status(
+async def read_station_status(
     velib_data_base_path: HttpUrl | Path,
     /,
     *,
-    timeout: timedelta,
+    http_client: httpx.AsyncClient,
 ) -> pd.DataFrame:
+    skeleton = Skeleton.tables.STATION_STATUS
+
     stations_data = cast(
         Any,
-        read_json(velib_data_base_path, Path("station_status.json"), timeout=timeout),
+        await read_json(
+            velib_data_base_path,
+            Path("station_status.json"),
+            http_client=http_client,
+        ),
     )["data"]["stations"]
     station_statuses: list[Mapping[str, Any]] = []
     for station_status in stations_data:
@@ -84,27 +94,55 @@ def read_station_status(
             bike_type, bikes = next(iter(num_bikes_available_types.items()))
             station_statuses.append(
                 {
-                    StationStatusTableColumn.STATION_ID.value: station_status[
-                        "station_id"
-                    ],
-                    StationStatusTableColumn.BIKE_TYPE.value: bike_type,
-                    StationStatusTableColumn.BIKES.value: bikes,
+                    skeleton.STATION_ID.name: station_status["station_id"],
+                    skeleton.BIKE_TYPE.name: bike_type,
+                    skeleton.BIKES.name: bikes,
                 }
             )
     return pd.DataFrame(station_statuses)
 
 
-def load_tables(session: tt.Session, /, *, config: Config) -> None:
-    station_details_df = read_station_details(
-        reverse_geocoding_path=config.reverse_geocoding_path,
-        timeout=config.requests_timeout,
-        velib_data_base_path=config.velib_data_base_path,
-    )
-    station_status_df = read_station_status(
-        config.velib_data_base_path,
-        timeout=config.requests_timeout,
+async def load_tables(
+    session: tt.Session,
+    /,
+    *,
+    config: Config,
+    http_client: httpx.AsyncClient,
+) -> None:
+    if config.data_refresh_period is None:
+        reverse_geocoding_path: HttpUrl | FilePath = (
+            RESOURCES_DIRECTORY / "station_location.csv"
+        )
+        velib_data_base_path: HttpUrl | DirectoryPath = RESOURCES_DIRECTORY
+    else:
+        reverse_geocoding_path = HttpUrl(
+            "https://api-adresse.data.gouv.fr/reverse/csv/"
+        )
+        velib_data_base_path = HttpUrl(
+            "https://velib-metropole-opendata.smovengo.cloud/opendata/Velib_Metropole"
+        )
+
+    station_details_df, station_status_df = await asyncio.gather(
+        read_station_details(
+            http_client=http_client,
+            reverse_geocoding_path=reverse_geocoding_path,
+            velib_data_base_path=velib_data_base_path,
+        ),
+        read_station_status(
+            velib_data_base_path,
+            http_client=http_client,
+        ),
     )
 
-    with session.start_transaction():
-        session.tables[Table.STATION_DETAILS.value].load_pandas(station_details_df)
-        session.tables[Table.STATION_STATUS.value].load_pandas(station_status_df)
+    with (
+        tt.mapping_lookup(check=config.check_mapping_lookups),
+        session.tables.data_transaction(),
+    ):
+        await asyncio.gather(
+            session.tables[Skeleton.tables.STATION_DETAILS.name].load_async(
+                station_details_df
+            ),
+            session.tables[Skeleton.tables.STATION_STATUS.name].load_async(
+                station_status_df
+            ),
+        )

@@ -1,31 +1,35 @@
-from __future__ import annotations
-
 import atoti as tt
 import pandas as pd
 
-from app import Cube, StationCubeLocationLevel, StationCubeMeasure
+from app import Skeleton
+
+from .expected_total_capacity import EXPECTED_TOTAL_CAPACITY
 
 
 def test_total_capacity(session: tt.Session) -> None:
-    station_cube = session.cubes[Cube.STATION.value]
-    result = station_cube.query(
-        station_cube.measures[StationCubeMeasure.CAPACITY.value]
-    )
+    skeleton = Skeleton.cubes.STATION
+    cube = session.cubes[skeleton.name]
+    m = cube.measures
+    result = cube.query(m[skeleton.measures.CAPACITY.name])
     expected_result = pd.DataFrame(
-        columns=[StationCubeMeasure.CAPACITY.value],
-        data=[
-            (45_850),
-        ],
-        dtype="Int32",
+        {
+            skeleton.measures.CAPACITY.name: pd.Series(
+                [EXPECTED_TOTAL_CAPACITY], dtype="Int32"
+            ),
+        }
     )
     pd.testing.assert_frame_equal(result, expected_result)
 
 
 def test_departments(session: tt.Session) -> None:
-    station_cube = session.cubes[Cube.STATION.value]
-    result = station_cube.query(
-        station_cube.measures["contributors.COUNT"],
-        levels=[station_cube.levels[StationCubeLocationLevel.DEPARTMENT.value]],
+    skeleton = Skeleton.cubes.STATION
+    cube = session.cubes[skeleton.name]
+    l, m = cube.levels, cube.measures
+    result = cube.query(
+        m[skeleton.measures.CONTRIBUTORS_COUNT.name],
+        levels=[
+            l[skeleton.dimensions.STATION_DETAILS.LOCATION.DEPARTMENT.key],
+        ],
     )
     assert list(result.index) == [
         "75, Paris, Île-de-France",

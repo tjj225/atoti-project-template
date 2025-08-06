@@ -1,21 +1,34 @@
-# syntax=docker/dockerfile:1.2
-FROM python:3.9.12-slim AS builder
+# Inspired from https://github.com/astral-sh/uv-docker-example/blob/dee88a8c43be3b16b0ad58f0daee5eaee7e2157a/multistage.Dockerfile.
 
-RUN --mount=type=cache,target=/root/.cache pip install poetry==1.3.1
-RUN poetry config virtualenvs.create false
+# Keep in sync with `.github/workflows/test.yml`.
+FROM ghcr.io/astral-sh/uv:0.5.6-python3.10-bookworm-slim AS builder
 
-COPY poetry.lock pyproject.toml ./
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-RUN --mount=type=cache,target=/root/.cache poetry install --no-root --only main --sync
+WORKDIR /venv
 
-FROM python:3.9.12-slim AS runner
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-dev --no-install-project
+RUN --mount=type=bind,source=skeleton,target=skeleton_tmp \
+    mkdir app && \
+    uv run python -m skeleton_tmp && \
+    mv app/skeleton skeleton && \
+    rm -r app
+
+# Keep this synced with the builder image.
+FROM python:3.10-slim-bookworm
+
+COPY --from=builder /venv app
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+COPY app app
 
 ENV ATOTI_HIDE_EULA_MESSAGE=true
 ENV PORT=80
 
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
-COPY app app
-
-ENTRYPOINT ["python", "-u", "-m", "app"]
-
 EXPOSE $PORT
+
+CMD ["python", "-O", "-u", "-m", "app"]

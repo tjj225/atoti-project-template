@@ -1,20 +1,26 @@
-from __future__ import annotations
-
-from collections.abc import Callable
-from datetime import timedelta
-from threading import Event, Thread
+import asyncio
+from collections.abc import AsyncGenerator, Awaitable, Callable
+from contextlib import asynccontextmanager
 
 
-def run_periodically(
-    callback: Callable[[], None], /, *, daemon: bool | None = None, period: timedelta
-) -> Callable[[], None]:
-    period_in_seconds = period.total_seconds()
-    stopped = Event()
+@asynccontextmanager
+async def run_periodically(
+    callback: Callable[[], Awaitable[None]],
+    /,
+    *,
+    period: float,
+) -> AsyncGenerator[None]:
+    stopped = asyncio.Event()
 
-    def loop() -> None:
-        while not stopped.wait(period_in_seconds):
-            callback()
+    async def loop() -> None:
+        while not stopped.is_set():
+            await callback()
+            await asyncio.sleep(period)
 
-    Thread(target=loop, daemon=daemon).start()
+    task = asyncio.create_task(loop())
 
-    return stopped.set
+    try:
+        yield
+    finally:
+        stopped.set()
+        await task
